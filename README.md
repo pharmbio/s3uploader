@@ -11,4 +11,5 @@ S3ImageUploader run method is:
 - if there are new images create a s3 boto client (wrapped in s3_client_wrapper, to make sure there is a fresh s3 token always)
 - upload file/image to s3
 - remove file/image from database
-
+<br>
+there is also a Dockerfile and a docker-compose file for running the service in docker with docker-compose
