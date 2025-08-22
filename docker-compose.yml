@@ -1,0 +1,24 @@
+version: '3.7'
+
+services:
+  s3uploader:
+    build: .
+    env_file: .env
+    volumes:
+      - /home/anders/.aws:/root/.aws:ro
+      - /share/mikro:/share/mikro:ro
+      - /share/mikro2:/share/mikro2:ro
+      - /share/mikro3:/share/mikro3:ro
+    restart: always
+    networks:
+      - default
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "10"
+
+networks:
+  default:
+    driver: bridge
+
