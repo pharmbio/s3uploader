@@ -1,0 +1,3 @@
+psycopg2-binary==2.9.10
+boto3==1.35 # I had problems using 1.36 Error: An error occurred (XAmzContentSHA256Mismatch) when calling the PutObject operation: Unknown
+python-dotenv
