@@ -1,15 +1,14 @@
 # s3uploader
-service that uploads images to s3
 
-s3_image_uploader.py contains the main S3ImageUploader class
-<br>
-main_uploader.py is creating the S3ImageUploader class and call the run method
-<br>
-S3ImageUploader run method is:
-<br>
-- polling database every 30 sec to if there are new entries in the database table "upload_to_s3"
-- if there are new images create a s3 boto client (wrapped in s3_client_wrapper, to make sure there is a fresh s3 token always)
-- upload file/image to s3
-- remove file/image from database
-<br>
-there is also a Dockerfile and a docker-compose file for running the service in docker with docker-compose
+- Service that uploads images to S3
+- Files
+  - `s3_image_uploader.py`: contains the main `S3ImageUploader` class
+  - `main_uploader.py`: creates an `S3ImageUploader` instance and calls its `run` method
+- `S3ImageUploader.run()`:
+  - Polls the database every 30 seconds for new entries in the `upload_to_s3` table
+  - If there are new images:
+    - Creates an S3 boto client (wrapped in `s3_client_wrapper` to ensure a fresh S3 token)
+    - Uploads the file/image to S3
+    - Removes the file/image from the database
+- Deployment
+  - `Dockerfile` and `docker-compose.yml` for running the service with Docker Compose
