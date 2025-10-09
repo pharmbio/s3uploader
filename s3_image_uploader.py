@@ -6,6 +6,7 @@ from typing import List, Optional
 from database import Database
 from s3_client_wrapper import S3ClientWrapper
 from botocore.exceptions import ClientError
+from error_utils import send_error_to_slack
 
 class S3MeltdownError(Exception):
     """Raised when we detect an S3 meltdown/offline situation, to skip further uploads."""
@@ -122,14 +123,17 @@ class S3ImageUploader:
                 self.consecutive_meltdown_errors += 1
                 if self.consecutive_meltdown_errors >= self.meltdown_threshold:
                     logging.error("S3 meltdown detected (consecutive service errors).")
+                    send_error_to_slack(
+                        "S3 meltdown detected while checking object existence.",
+                        title="S3 Meltdown"
+                    )
                     raise S3MeltdownError("Too many consecutive meltdown-level errors.")
             # Re-raise for normal handling
             raise e
 
     def upload_file_to_s3(self, s3_client, bucket_name: str, local_path: str, s3_path: str):
         """
-        Decides which upload approach to use (multi-part vs. single-part).
-        For simplicity, we use put_object for single-part in this example.
+        Use simple non multipart for these not so big files
         """
         self.upload_file_to_s3_non_multipart(s3_client, bucket_name, local_path, s3_path)
 
@@ -148,6 +152,10 @@ class S3ImageUploader:
                 self.consecutive_meltdown_errors += 1
                 if self.consecutive_meltdown_errors >= self.meltdown_threshold:
                     logging.error("S3 meltdown detected (upload).")
+                    send_error_to_slack(
+                        "S3 meltdown detected during upload.",
+                        title="S3 Meltdown"
+                    )
                     raise S3MeltdownError("Too many consecutive meltdown-level errors.")
             # Re-raise to handle as normal failure
             raise
@@ -194,10 +202,15 @@ class S3ImageUploader:
 
                 if meltdown_detected:
                     logging.info("Exiting early due to meltdown.")
+                    send_error_to_slack(
+                        "Halting uploader loop due to S3 meltdown.",
+                        title="Uploader Stopped"
+                    )
                     break  # End the while loop
 
             except Exception as e:
                 logging.exception(f"An error occurred during the upload loop: {e}")
+                send_error_to_slack(str(e), title="Uploader Loop Error")
                 # Decide if you want to break or keep going
                 # We'll keep going to avoid stopping on a single random error
                 pass
@@ -247,6 +260,7 @@ class S3ImageUploader:
 
             except Exception as e:
                 logging.exception(f"An error occurred in the single-threaded loop: {e}")
+                send_error_to_slack(str(e), title="Uploader Loop Error")
                 # You can decide whether to break or keep going. We keep going:
                 pass
 
