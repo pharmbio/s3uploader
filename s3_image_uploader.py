@@ -7,6 +7,26 @@ from database import Database
 from s3_client_wrapper import S3ClientWrapper
 from botocore.exceptions import ClientError
 from error_utils import send_error_to_slack
+import threading
+
+# Rate-limit Slack notifications originating from this module
+_SLACK_LOCK = threading.Lock()
+_SLACK_LAST_SENT_TS: float = 0.0
+_SLACK_MIN_INTERVAL_SEC = 30 * 60  # 30 minutes
+
+def send_error_to_slack_rate_limited(message: str, title: str = "Error", min_interval_sec: int = _SLACK_MIN_INTERVAL_SEC) -> bool:
+    global _SLACK_LAST_SENT_TS
+    now = time.time()
+    with _SLACK_LOCK:
+        if (now - _SLACK_LAST_SENT_TS) < min_interval_sec:
+            return False
+        _SLACK_LAST_SENT_TS = now
+    try:
+        send_error_to_slack(message, title=title)
+        return True
+    except Exception:
+        # Do not let Slack errors impact uploader; just swallow
+        return False
 
 class S3MeltdownError(Exception):
     """Raised when we detect an S3 meltdown/offline situation, to skip further uploads."""
@@ -123,7 +143,7 @@ class S3ImageUploader:
                 self.consecutive_meltdown_errors += 1
                 if self.consecutive_meltdown_errors >= self.meltdown_threshold:
                     logging.error("S3 meltdown detected (consecutive service errors).")
-                    send_error_to_slack(
+                    send_error_to_slack_rate_limited(
                         "S3 meltdown detected while checking object existence.",
                         title="S3 Meltdown"
                     )
@@ -152,7 +172,7 @@ class S3ImageUploader:
                 self.consecutive_meltdown_errors += 1
                 if self.consecutive_meltdown_errors >= self.meltdown_threshold:
                     logging.error("S3 meltdown detected (upload).")
-                    send_error_to_slack(
+                    send_error_to_slack_rate_limited(
                         "S3 meltdown detected during upload.",
                         title="S3 Meltdown"
                     )
@@ -161,6 +181,11 @@ class S3ImageUploader:
             raise
 
     def run(self):
+        # Always send startup info to Slack (not rate-limited)
+        try:
+            send_error_to_slack("Started S3ImageUploader run()", title="Uploader Start")
+        except Exception:
+            pass
         self.run_multithreaded()
 
     def run_multithreaded(self):
@@ -202,7 +227,7 @@ class S3ImageUploader:
 
                 if meltdown_detected:
                     logging.info("Exiting early due to meltdown.")
-                    send_error_to_slack(
+                    send_error_to_slack_rate_limited(
                         "Halting uploader loop due to S3 meltdown.",
                         title="Uploader Stopped"
                     )
@@ -210,7 +235,7 @@ class S3ImageUploader:
 
             except Exception as e:
                 logging.exception(f"An error occurred during the upload loop: {e}")
-                send_error_to_slack(str(e), title="Uploader Loop Error")
+                send_error_to_slack_rate_limited(str(e), title="Uploader Loop Error")
                 # Decide if you want to break or keep going
                 # We'll keep going to avoid stopping on a single random error
                 pass
@@ -260,7 +285,7 @@ class S3ImageUploader:
 
             except Exception as e:
                 logging.exception(f"An error occurred in the single-threaded loop: {e}")
-                send_error_to_slack(str(e), title="Uploader Loop Error")
+                send_error_to_slack_rate_limited(str(e), title="Uploader Loop Error")
                 # You can decide whether to break or keep going. We keep going:
                 pass
 

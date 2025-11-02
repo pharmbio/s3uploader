@@ -25,7 +25,22 @@ class S3ClientWrapper:
             config.read(aws_credentials_path)
             expiry_str = config.get('default', 'expiration', fallback=None)
             if expiry_str:
-                return datetime.datetime.fromisoformat(expiry_str).astimezone(datetime.timezone.utc)
+                # Handle common AWS ISO-8601 forms, including trailing 'Z'
+                s = expiry_str.strip()
+                # Replace trailing 'Z' (UTC) with '+00:00' for fromisoformat
+                if s.endswith('Z'):
+                    s = s[:-1] + '+00:00'
+                try:
+                    dt = datetime.datetime.fromisoformat(s)
+                except ValueError:
+                    # Last resort: try without timezone and assume UTC
+                    try:
+                        dt = datetime.datetime.fromisoformat(s.split('+')[0].split('-00:00')[0])
+                    except Exception:
+                        raise
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=datetime.timezone.utc)
+                return dt.astimezone(datetime.timezone.utc)
         except Exception as e:
             print(f"Error reading expiration from AWS credentials: {e}")
         return None

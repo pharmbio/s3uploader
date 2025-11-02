@@ -58,9 +58,9 @@ def main():
     }
     test_bucket = "mikro"
 
-    uploader.delete_image(test_image_record, test_bucket)
+    #uploader.delete_image(test_image_record, test_bucket)
 
-    uploader.upload_image(test_image_record, test_bucket)
+    #uploader.upload_image(test_image_record, test_bucket)
 
     logging.info(f"image_record: {test_image_record}")
 
